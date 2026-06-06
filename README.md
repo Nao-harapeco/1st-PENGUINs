@@ -14,7 +14,7 @@
  
  「LIVSENT」をNFCタグに格納し、スマホをかざすことで、倒れている人の救命処置に対する同意を確認することができます。
  
- 同意確認他、AEDマップや救命処置案内、、メトロノーム、119番通報案内など、救命処置を最適化する機能が搭載されています。
+ 同意確認他、AEDマップや救命処置案内、メトロノーム、119番通報案内など、救命処置を最適化する機能が搭載されています。
 
  ビジネスコンテスト出場時の都合上、一つのファイルにHTML,SCC,JavaScriptをまとめています。
  
@@ -35,4 +35,4 @@
 
 ・質疑応答
 
-URL：https://nao-harapeco.github.io/1st-PENGUINs/index.html
+デモサイトURL：https://nao-harapeco.github.io/1st-PENGUINs/index.html
