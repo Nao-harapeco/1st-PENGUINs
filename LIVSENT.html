@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIVSENT - 救命支援アプリ</title>
+    <!-- Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary-red: #ff3b30;
+            --secondary-red: #d70015;
+            --bg-white: #ffffff;
+            --card-gray: #f2f2f7;
+            --text-black: #1c1c1e;
+            --text-gray: #8e8e93;
+            --accent-blue: #007aff;
+            --accent-green: #34c759;
+            --border-light: #e5e5ea;
+            --font-outfit: 'Outfit', sans-serif;
+            --font-jp: 'Noto Sans JP', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: var(--font-jp);
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        /* Phone Aspect Ratio Container (16:9) */
+        .phone-container {
+            width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+            aspect-ratio: 9 / 16;
+            background-color: var(--bg-white);
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-radius: 48px;
+            border: 14px solid #1a1a1a;
+            outline: 2px solid #333;
+        }
+
+        @media (max-width: 500px) {
+            .phone-container {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+                border: none;
+                outline: none;
+            }
+        }
+
+        header {
+            padding: 16px 20px;
+            text-align: center;
+            background-color: var(--bg-white);
+            border-bottom: 1px solid var(--border-light);
+            z-index: 1000;
+        }
+
+        header h1 {
+            font-family: var(--font-outfit);
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--text-black);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #map-container {
+            height: 50%;
+            width: 100%;
+            position: relative;
+            border-bottom: 2px solid var(--border-light);
+            background: #f8f9fa;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .center-ui {
+            padding: 24px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+        }
+
+        .primary-btn {
+            width: 100%;
+            height: 80px;
+            background-color: var(--primary-red);
+            border: none;
+            border-radius: 24px;
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            box-shadow: 0 8px 20px rgba(255, 59, 48, 0.3);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+        }
+
+        .primary-btn:active {
+            transform: scale(0.96);
+        }
+
+        .pulse-animation {
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.6);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(255, 59, 48, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
+            }
+        }
+
+        .bottom-nav {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 0 20px 24px 20px;
+        }
+
+        .nav-btn {
+            height: 110px;
+            background-color: var(--card-gray);
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            color: var(--text-black);
+            font-size: 17px;
+            font-weight: 700;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:active {
+            transform: scale(0.95);
+        }
+
+        .nav-btn svg {
+            width: 30px;
+            height: 30px;
+            color: var(--accent-blue);
+        }
+
+        /* Overlay Views */
+        .overlay-view {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-white);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .overlay-view.active {
+            transform: translateY(0);
+        }
+
+        .view-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--bg-white);
+            height: 70px;
+        }
+
+        .close-btn {
+            background: #f2f2f7;
+            border: 1px solid var(--border-light);
+            color: var(--accent-blue);
+            padding: 8px 16px;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .view-content {
+            flex: 1;
+            padding: 24px 20px;
+            overflow-y: auto;
+        }
+
+        /* Login and Settings Styling */
+        .hero {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-top: 10px;
+        }
+
+        .hero h2 {
+            font-family: var(--font-outfit);
+            font-size: 28px;
+        }
+
+        .hero p {
+            color: var(--text-gray);
+            font-size: 14px;
+        }
+
+        .card {
+            background: var(--card-gray);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-light);
+        }
+
+        .card h4 {
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-gray);
+            margin-bottom: 8px;
+            padding-left: 4px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 16px;
+            border-radius: 18px;
+            border: 1.5px solid var(--border-light);
+            background: var(--bg-white);
+            font-size: 16px;
+        }
+
+        .primary-action-btn {
+            width: 100%;
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 18px;
+            font-weight: 700;
+            font-size: 17px;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
+
+        .demo-btn {
+            background: var(--bg-white);
+            color: var(--accent-blue);
+            border: 2px solid var(--accent-blue);
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 6px 0;
+        }
+
+        .radio-item input[type="radio"] {
+            width: 22px;
+            height: 22px;
+            accent-color: var(--accent-blue);
+        }
+
+        .radio-item span {
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        /* Map Marker Styles */
+        .aed-icon-div {
+            background-color: var(--primary-red);
+            width: 14px;
+            height: 14px;
+            border: 2.5px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(255, 59, 48, 0.4);
+        }
+
+        .user-icon-div {
+            background-color: var(--accent-blue);
+            width: 18px;
+            height: 18px;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0, 122, 255, 0.6);
+        }
+
+        /* Emergency Steps */
+        .emergency-step {
+            margin-bottom: 16px;
+            background: var(--card-gray);
+            padding: 18px;
+            border-radius: 20px;
+            border: 1px solid var(--border-light);
+        }
+
+        .emergency-step h3 {
+            font-size: 13px;
+            color: var(--text-gray);
+            margin-bottom: 4px;
+        }
+
+        .emergency-step p {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        #countdown-bar-container {
+            width: 100%;
+            height: 10px;
+            background-color: var(--border-light);
+            border-radius: 6px;
+            margin-top: 16px;
+            display: none;
+            overflow: hidden;
+        }
+
+        #countdown-bar {
+            height: 100%;
+            width: 100%;
+            background-color: var(--secondary-red);
+            transition: width 0.1s linear;
+        }
+
+        #countdown-text {
+            font-size: 15px;
+            color: var(--secondary-red);
+            font-weight: 700;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Procedure Switching Tabs */
+        .tab-group {
+            display: flex;
+            background: var(--card-gray);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 9px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-gray);
+        }
+
+        .tab.active {
+            background: white;
+            color: var(--text-black);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Metronome Button */
+        .metronome-btn {
+            width: 100%;
+            background: #eef1f6;
+            border: 2px solid var(--border-light);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .metronome-btn.active {
+            background: #fff9c4;
+            border-color: #fbc02d;
+            animation: beat 0.54s infinite;
+        }
+
+        @keyframes beat {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Patient Info Table */
+        .info-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .info-table tr {
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .info-table th {
+            text-align: left;
+            padding: 14px 12px;
+            font-size: 13px;
+            color: var(--text-gray);
+            font-weight: 600;
+            width: 110px;
+            vertical-align: top;
+            background: var(--card-gray);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .info-table td {
+            padding: 14px 12px;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .crew-btn {
+            width: 100%;
+            background: var(--primary-red);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 18px;
+            font-weight: 700;
+            font-size: 17px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="phone-container">
+        <header>
+            <h1>LIVSENT</h1>
+            <p
+                style="font-size: 13px; color: var(--accent-green); font-weight: 600; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z" />
+                </svg>
+                救命処置及びAEDの使用に同意します
+            </p>
+        </header>
+
+        <main>
+            <div id="map-container">
+                <div id="map"></div>
+            </div>
+
+            <div class="center-ui">
+                <button class="primary-btn pulse-animation" onclick="openView('emergency-view')">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z" />
+                    </svg>
+                    119番通報する
+                </button>
+            </div>
+
+            <div class="bottom-nav">
+                <button class="nav-btn" onclick="openView('login-view')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>意思変更</span>
+                </button>
+                <button class="nav-btn" onclick="openView('procedure-view')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <line x1="10" y1="9" x2="8" y2="9"></line>
+                    </svg>
+                    <span>救命手順表示</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- Emergency View -->
+        <div id="emergency-view" class="overlay-view">
+            <div class="view-header">
+                <button class="close-btn" onclick="handleEmergencyClose()">閉じる</button>
+                <h2 style="font-size: 17px; font-weight: 700;">119番通報サポート</h2>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="view-content">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <button id="secondary-119-btn" class="primary-btn" onclick="handleSecondaryCallClick()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z" />
+                        </svg>
+                        <span id="btn-label-text">119番通報する</span>
+                    </button>
+                    <div id="countdown-bar-container">
+                        <div id="countdown-bar"></div>
+                    </div>
+                    <div id="countdown-text">5秒後に発信します</div>
+                </div>
+                <!-- Full 119 Guidance Restoration -->
+                <div class="emergency-step" style="background: #e1f5fe; border: 1.5px solid #b3e5fc;">
+                    <p
+                        style="font-size: 15px; font-weight: 700; color: #0277bd; line-height: 1.5; display: flex; align-items: flex-start; gap: 8px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-top: 2px;">
+                            <path
+                                d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z" />
+                        </svg>
+                        119番通報では落ち着いて明確に情報を伝えることが大切です。
+                    </p>
+                </div>
+
+                <div class="emergency-step">
+                    <h3>1. 火事ですか？救急ですか？</h3>
+                    <p>「救急です」とはっきりと伝えてください。</p>
+                </div>
+                <div class="emergency-step">
+                    <h3>2. 場所を伝える（住所・現在地）</h3>
+                    <p id="location-display">現在地：取得中...</p>
+                    <p
+                        style="font-size: 14px; font-weight: normal; color: var(--accent-blue); margin-top: 8px; display: flex; align-items: center; gap: 4px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,16.5V7H13V16.5H11M11,18V16.5H13V18H11Z" />
+                        </svg>
+                        <span id="location-status">位置情報を取得しています...</span>
+                    </p>
+                </div>
+                <div class="emergency-step">
+                    <h3>3. どのような状況ですか？</h3>
+                    <p>「人が倒れています」「意識がありません」など、患者の様態や、意識・呼吸の有無を伝えます。</p>
+                </div>
+                <div class="emergency-step">
+                    <h3>4. 通報者の情報を伝える</h3>
+                    <p>あなたのお名前と、今使っている電話番号を伝えてください。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login View -->
+        <div id="login-view" class="overlay-view">
+            <div class="view-header">
+                <button class="close-btn" onclick="closeView('login-view')">戻る</button>
+                <h2 style="font-size: 17px; font-weight: 700;">ログイン</h2>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="view-content">
+                <div class="hero">
+                    <h2>LIVSENT</h2>
+                    <p>アカウントにログインしてください</p>
+                </div>
+                <div class="input-group"><label>メールアドレス</label><input type="email" placeholder="example@livsent.jp">
+                </div>
+                <div class="input-group"><label>パスワード</label><input type="password" placeholder="••••••••"></div>
+                <button class="primary-action-btn">ログイン</button>
+                <button class="primary-action-btn demo-btn" onclick="openView('intent-view')">デモ用ログイン</button>
+                <button class="crew-btn" onclick="openView('patient-info-view')">救急隊用ログイン（デモ）</button>
+            </div>
+        </div>
+
+        <!-- Patient Info View (Emergency Crew) -->
+        <div id="patient-info-view" class="overlay-view">
+            <div class="view-header">
+                <button class="close-btn" onclick="closeView('patient-info-view')">戻る</button>
+                <h2 style="font-size: 17px; font-weight: 700;">患者情報</h2>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="view-content">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div
+                        style="width: 64px; height: 64px; background: var(--card-gray); border-radius: 50%; margin: 0 auto 12px; display: flex; justify-content: center; align-items: center;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-gray)"
+                            stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-gray);">LIVSENT 登録情報</p>
+                </div>
+                <table class="info-table">
+                    <tr>
+                        <th>氏名</th>
+                        <td>山田 太郎</td>
+                    </tr>
+                    <tr>
+                        <th>年齢</th>
+                        <td>52歳</td>
+                    </tr>
+                    <tr>
+                        <th>性別</th>
+                        <td>男性</td>
+                    </tr>
+                    <tr>
+                        <th>既往歴<br>(持病)</th>
+                        <td>高血圧、2型糖尿病</td>
+                    </tr>
+                    <tr>
+                        <th>かかりつけ<br>医療機関</th>
+                        <td>東京中央病院<br><span style="font-size: 13px; font-weight: normal; color: var(--text-gray);">TEL:
+                                03-1234-5678</span></td>
+                    </tr>
+                    <tr>
+                        <th>現在服用中<br>の薬</th>
+                        <td>アムロジピン 5mg（降圧剤）<br>メトホルミン 500mg（血糖降下薬）</td>
+                    </tr>
+                    <tr>
+                        <th>アレルギー<br>情報</th>
+                        <td style="color: var(--primary-red);">ペニシリン系抗生物質</td>
+                    </tr>
+                </table>
+                <div class="emergency-step" style="background: #fff3e0; border: 1.5px solid #ffe0b2; margin-top: 20px;">
+                    <p style="font-size: 14px; font-weight: 700; color: #e65100;">⚠ この情報は救急活動の目的のみに使用してください。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Intent Settings View -->
+        <div id="intent-view" class="overlay-view">
+            <div class="view-header">
+                <button class="close-btn" onclick="closeView('intent-view')">戻る</button>
+                <h2 style="font-size: 17px; font-weight: 700;">救命意思設定</h2>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="view-content">
+                <div class="card">
+                    <h4>救命処置への同意</h4>
+                    <p style="font-size: 13px; color: var(--text-gray); margin-bottom: 16px;">
+                        救命処置（人工呼吸、胸骨圧迫等）を行うことに同意しますか？</p>
+                    <div class="radio-group">
+                        <label class="radio-item"><input type="radio" name="lifesaving" value="yes"
+                                checked><span>同意する</span></label>
+                        <label class="radio-item"><input type="radio" name="lifesaving"
+                                value="no"><span>同意しない</span></label>
+                    </div>
+                </div>
+                <div class="card">
+                    <h4>AEDの使用への同意</h4>
+                    <p style="font-size: 13px; color: var(--text-gray); margin-bottom: 16px;">周囲の人がAEDを使用することに同意しますか？
+                    </p>
+                    <div class="radio-group">
+                        <label class="radio-item"><input type="radio" name="aed" value="yes"
+                                checked><span>同意する</span></label>
+                        <label class="radio-item"><input type="radio" name="aed" value="no"><span>同意しない</span></label>
+                    </div>
+                </div>
+                <button class="primary-action-btn" onclick="closeView('intent-view')">保存して終了</button>
+            </div>
+        </div>
+
+        <!-- Procedure View Enhancement -->
+        <div id="procedure-view" class="overlay-view">
+            <div class="view-header">
+                <button class="close-btn" onclick="stopMetronome(); closeView('procedure-view')">戻る</button>
+                <h2 style="font-size: 17px; font-weight: 700;">救命手順</h2>
+                <div style="width: 50px;"></div>
+            </div>
+            <div class="view-content">
+                <div class="tab-group">
+                    <div id="tab-adult" class="tab active" onclick="switchProcedure('adult')">大人</div>
+                    <div id="tab-child" class="tab" onclick="switchProcedure('child')">小児</div>
+                </div>
+
+                <div id="metronome-btn" class="metronome-btn" onclick="toggleMetronome()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12,7A5,5 0 0,0 7,12A5,5 0 0,0 12,17A5,5 0 0,0 17,12A5,5 0 0,0 12,7Z" />
+                    </svg>
+                    <span>メトロノーム開始 (110 BPM)</span>
+                </div>
+
+                <div id="procedure-content-adult">
+                    <div class="emergency-step">
+                        <h3>1. 胸骨圧迫</h3>
+                        <p>胸の真ん中を「強く・速く・絶え間なく」圧迫します。深さは約5cm。テンポは100~120回/分。</p>
+                    </div>
+                </div>
+
+                <div id="procedure-content-child" style="display: none;">
+                    <div class="emergency-step">
+                        <h3>1. 胸骨圧迫 (小児)</h3>
+                        <p>胸の厚みの約1/3が沈むまで圧迫します。片手または両手で適切な強さで行ってください。</p>
+                    </div>
+                </div>
+
+                <div class="emergency-step">
+                    <h3>2. AEDの使用</h3>
+                    <p>電源を入れ、音声ガイダンスに従ってください。成人と小児でパットを使い分けるか、スイッチを切り替えてください。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+        let map;
+        let markers = [];
+        let userLat = 35.6812;
+        let userLng = 139.7671;
+
+        async function initMap() {
+            try {
+                // Geolocation APIで現在地を取得
+                if (navigator.geolocation) {
+                    try {
+                        const position = await new Promise((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                        });
+                        userLat = position.coords.latitude;
+                        userLng = position.coords.longitude;
+                    } catch (e) {
+                        console.warn("位置情報の取得に失敗。デフォルト位置を使用します。", e);
+                    }
+                }
+
+                map = L.map('map', { zoomControl: false, attributionControl: false }).setView([userLat, userLng], 15);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+
+                const userIcon = L.divIcon({ html: `<div class="user-icon-div"></div>`, className: 'user-icon', iconSize: [18, 18] });
+                L.marker([userLat, userLng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+
+                await loadRealAEDs(userLat, userLng);
+                reverseGeocode(userLat, userLng);
+
+                setTimeout(() => { map.invalidateSize(); }, 600);
+            } catch (e) {
+                console.error("マップの初期化エラー:", e);
+            }
+        }
+
+        async function reverseGeocode(lat, lng) {
+            const locDisplay = document.getElementById('location-display');
+            const locStatus = document.getElementById('location-status');
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=ja`);
+                const data = await res.json();
+                const addr = data.address;
+                let display = '';
+                if (addr) {
+                    const parts = [addr.province || addr.state || '', addr.city || addr.town || addr.village || '', addr.suburb || addr.neighbourhood || '', addr.road || ''].filter(Boolean);
+                    display = parts.join(' ');
+                }
+                if (locDisplay) locDisplay.innerText = '現在地：' + (display || data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+                if (locStatus) locStatus.innerText = '正確な位置情報を送信しています';
+            } catch (e) {
+                console.warn('逆ジオコーディング失敗:', e);
+                if (locDisplay) locDisplay.innerText = `現在地：${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                if (locStatus) locStatus.innerText = '座標を送信しています';
+            }
+        }
+
+        async function loadRealAEDs(lat, lng) {
+            const radius = 1500;
+            const query = `[out:json];node(around:${radius},${lat},${lng})["emergency"="defibrillator"];out;`;
+            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+                const aedIcon = L.divIcon({ html: `<div class="aed-icon-div"></div>`, className: 'aed-icon', iconSize: [14, 14] });
+                data.elements.forEach(node => {
+                    markers.push(L.marker([node.lat, node.lon], { icon: aedIcon }).addTo(map));
+                });
+                console.log(`取得されたAEDの数: ${data.elements.length}`);
+            } catch (e) {
+                console.error("AEDデータの取得に失敗:", e);
+                if (markers.length === 0) {
+                    const aedIcon = L.divIcon({ html: `<div class="aed-icon-div"></div>`, className: 'aed-icon', iconSize: [14, 14] });
+                    [[lat + 0.001, lng + 0.001], [lat - 0.002, lng + 0.001], [lat, lng - 0.002]].forEach(loc => {
+                        markers.push(L.marker(loc, { icon: aedIcon }).addTo(map));
+                    });
+                }
+            }
+        }
+
+        initMap();
+
+        function openView(id) { document.getElementById(id).classList.add('active'); }
+        function closeView(id) { document.getElementById(id).classList.remove('active'); }
+        function handleEmergencyClose() { resetCountdown(); closeView('emergency-view'); }
+
+        let countdownTimer = null;
+        let isCountingDown = false;
+        function handleSecondaryCallClick() {
+            const btn = document.getElementById('secondary-119-btn');
+            const label = document.getElementById('btn-label-text');
+            const barContainer = document.getElementById('countdown-bar-container');
+            const bar = document.getElementById('countdown-bar');
+            const text = document.getElementById('countdown-text');
+            if (!isCountingDown) {
+                isCountingDown = true;
+                btn.style.backgroundColor = "#c7c7cc";
+                label.innerText = "キャンセル";
+                barContainer.style.display = "block";
+                bar.style.width = "100%";
+                text.style.display = "block";
+                text.innerText = "5秒後に発信します（タップでキャンセル）";
+                let progress = 100;
+                let seconds = 5;
+                const interval = 100;
+                const step = 100 / (5000 / interval);
+                countdownTimer = setInterval(() => {
+                    progress -= step;
+                    if (progress < 0) progress = 0;
+                    bar.style.width = `${progress}%`;
+                    let s = Math.ceil((progress / 100) * 5);
+                    if (s !== seconds && s > 0) {
+                        seconds = s;
+                        text.innerText = `${seconds}秒後に発信します（タップでキャンセル）`;
+                    }
+                    if (progress <= 0) {
+                        clearInterval(countdownTimer);
+                        countdownTimer = null;
+                        isCountingDown = false;
+                        text.innerText = "発信しています...";
+                        setTimeout(() => {
+                            alert("119番に発信します（デモ）");
+                            resetCountdown();
+                        }, 100);
+                    }
+                }, interval);
+            } else { resetCountdown(); }
+        }
+
+        // Procedure & Metronome Logic
+        function switchProcedure(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${type}`).classList.add('active');
+            if (type === 'adult') {
+                document.getElementById('procedure-content-adult').style.display = 'block';
+                document.getElementById('procedure-content-child').style.display = 'none';
+            } else {
+                document.getElementById('procedure-content-adult').style.display = 'none';
+                document.getElementById('procedure-content-child').style.display = 'block';
+            }
+        }
+
+        let metroTimer = null;
+        let metroAudioContext = null;
+        function toggleMetronome() {
+            const btn = document.getElementById('metronome-btn');
+            if (!metroTimer) {
+                btn.classList.add('active');
+                btn.querySelector('span').innerText = "メトロノーム停止 (110 BPM)";
+                startMetronome();
+            } else {
+                stopMetronome();
+            }
+        }
+
+        function startMetronome() {
+            if (!metroAudioContext) metroAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const interval = (60 / 110) * 1000;
+            metroTimer = setInterval(() => {
+                playTick();
+            }, interval);
+        }
+
+        function stopMetronome() {
+            if (metroTimer) clearInterval(metroTimer);
+            metroTimer = null;
+            const btn = document.getElementById('metronome-btn');
+            if (btn) {
+                btn.classList.remove('active');
+                btn.querySelector('span').innerText = "メトロノーム開始 (110 BPM)";
+            }
+        }
+
+        function playTick() {
+            if (!metroAudioContext) return;
+            const osc = metroAudioContext.createOscillator();
+            const gain = metroAudioContext.createGain();
+            osc.connect(gain);
+            gain.connect(metroAudioContext.destination);
+            osc.frequency.value = 1000;
+            gain.gain.setValueAtTime(0.1, metroAudioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, metroAudioContext.currentTime + 0.1);
+            osc.start();
+            osc.stop(metroAudioContext.currentTime + 0.1);
+        }
+        function resetCountdown() {
+            if (countdownTimer) clearInterval(countdownTimer);
+            countdownTimer = null;
+            isCountingDown = false;
+            const btn = document.getElementById('secondary-119-btn');
+            const label = document.getElementById('btn-label-text');
+            const barContainer = document.getElementById('countdown-bar-container');
+            const text = document.getElementById('countdown-text');
+            if (btn) btn.style.backgroundColor = "";
+            if (label) label.innerText = "119番通報する";
+            if (barContainer) barContainer.style.display = "none";
+            if (text) text.style.display = "none";
+        }
+    </script>
+</body>
+
+</html>
