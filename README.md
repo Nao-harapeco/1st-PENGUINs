@@ -37,4 +37,4 @@
 
 ・質疑応答
 
-デモサイトURL：https://nao-harapeco.github.io/1st-PENGUINs/index.html
+デモプロトタイプURL：https://nao-harapeco.github.io/1st-PENGUINs/index.html
